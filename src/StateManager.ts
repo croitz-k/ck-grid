@@ -382,9 +382,13 @@ export class StateManager {
     this._rows.push(newRow);
   }
 
-  public deleteRow(rowIndex: number) {
-    if (rowIndex >= 0 && rowIndex < this._rows.length) {
-      this._rows.splice(rowIndex, 1);
+  public deleteRow(viewIndex: number) {
+    const rowToDelete = this.getRowByViewIndex(viewIndex);
+    if (!rowToDelete) return;
+
+    const actualIndex = this._rows.findIndex(r => r.id === rowToDelete.id);
+    if (actualIndex !== -1) {
+      this._rows.splice(actualIndex, 1);
       
       // If no rows left, add one empty row for data entry mode
       if (this._rows.length === 0) {

@@ -354,7 +354,6 @@ export class InteractionManager {
       } },
       { label: 'divider', action: () => {} },
       { label: 'Delete Row', action: () => {
-        const pos = this.getCellAt(e.clientX, e.clientY);
         if (pos) {
           this.state.deleteRow(pos.rowIndex);
           this.state.setFocusedCell(null);
