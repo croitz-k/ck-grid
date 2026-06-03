@@ -332,12 +332,11 @@ export class InteractionManager {
 
     const actions = [
       { label: 'Copy', shortcut: 'Ctrl+C', action: () => document.execCommand('copy') },
-      { label: 'Paste', shortcut: 'Ctrl+V', action: () => navigator.clipboard.readText().then(text => {
-        // We can't easily trigger a 'paste' event manually with data, 
-        // so we reuse handlePaste logic or just let the user use Ctrl+V.
-        // For simplicity, we just remind them or implement a manual trigger.
+      { label: 'Paste', shortcut: 'Ctrl+V', action: () => {
+        // For security reasons, web browsers often restrict programmatic paste access.
+        // We prompt the user to use the native keyboard shortcut.
         alert('Please use Ctrl+V to paste for security reasons.');
-      }) },
+      } },
       { label: 'divider', action: () => {} },
       { label: 'Undo', shortcut: 'Ctrl+Z', action: () => {
         if (this.state.undo()) this.renderer.render();

@@ -231,14 +231,16 @@ export class StateManager {
     }
 
     // Re-map focus and selection indexes
-    if (focusedId !== null) {
+    if (focusedId !== null && focusedId !== undefined) {
       const newIndex = this.getViewIndexByRowId(focusedId);
       if (newIndex !== -1 && this._state.focusedCell) {
         this._state.focusedCell.rowIndex = newIndex;
       }
     }
 
-    if (selectionStartId !== null && selectionEndId !== null && this._state.selection) {
+    if (selectionStartId !== null && selectionStartId !== undefined && 
+        selectionEndId !== null && selectionEndId !== undefined && 
+        this._state.selection) {
       const newStartIdx = this.getViewIndexByRowId(selectionStartId);
       const newEndIdx = this.getViewIndexByRowId(selectionEndId);
       if (newStartIdx !== -1 && newEndIdx !== -1) {
