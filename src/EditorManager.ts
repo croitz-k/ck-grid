@@ -69,9 +69,15 @@ export class EditorManager {
         this.stopEditing(false);
         this.container.focus();
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        e.stopPropagation(); // Stop original event from bubbling to container
         this.stopEditing(true);
+        
         if (!this.editingCell) {
-          // Trigger the same key event on container to move focus
+          // Ensure container is focused so InteractionManager can handle the new event
+          this.container.focus();
+          
+          // Trigger a new navigation event on the container
           const navEvent = new KeyboardEvent('keydown', {
             key: e.key,
             bubbles: true,
