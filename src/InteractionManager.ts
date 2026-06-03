@@ -408,11 +408,15 @@ export class InteractionManager {
       } },
       { label: 'divider', action: () => {} },
       { label: 'Delete Row', action: () => {
+        console.log('[DEBUG] Delete Row clicked. Current pos:', pos);
         if (pos) {
+          console.log('[DEBUG] Deleting row at index:', pos.rowIndex);
           this.state.deleteRow(pos.rowIndex);
           this.state.setFocusedCell(null);
           this.state.setSelection(null);
           this.renderer.refresh();
+        } else {
+          console.error('[DEBUG] Cannot delete row: pos is null');
         }
       } },
       { label: 'divider', action: () => {} },

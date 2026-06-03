@@ -383,25 +383,36 @@ export class StateManager {
   }
 
   public deleteRow(viewIndex: number) {
+    console.log('[StateManager] deleteRow called with viewIndex:', viewIndex);
     // If pagination is enabled, viewIndex is relative to the current page.
     // However, InteractionManager calculates it relative to the top of pagedData.
     const rowToDelete = this.pagedData[viewIndex];
-    if (!rowToDelete) return;
+    console.log('[StateManager] Row to delete resolved:', rowToDelete);
+    if (!rowToDelete) {
+      console.warn('[StateManager] Row to delete not found at viewIndex:', viewIndex);
+      return;
+    }
 
     // Find in the master list
     const actualIndex = this._rows.findIndex(r => r.id === rowToDelete.id);
+    console.log('[StateManager] Actual index in master list:', actualIndex);
     if (actualIndex !== -1) {
       this._rows.splice(actualIndex, 1);
+      console.log('[StateManager] Row removed. Current row count:', this._rows.length);
       
       // If we deleted the only row on a later page, move to previous page
       if (this._pagination && this._state.currentPage > 1 && this.pagedData.length === 0) {
+        console.log('[StateManager] Current page now empty, moving back to page:', this._state.currentPage - 1);
         this._state.currentPage--;
       }
 
       // If no rows left at all, add one empty row for data entry mode
       if (this._rows.length === 0) {
+        console.log('[StateManager] No rows left, adding auto-entry row');
         this.addRow();
       }
+    } else {
+      console.error('[StateManager] Row found in pagedData but missing from master list! ID:', rowToDelete.id);
     }
   }
 }
