@@ -588,6 +588,9 @@ export class Renderer {
 
     document.body.appendChild(this.contextMenu);
 
+    // Stop mousedown from bubbling up to the window listener when clicking inside the menu
+    this.contextMenu.addEventListener('mousedown', (e) => e.stopPropagation());
+
     const closeMenu = () => {
       this.hideContextMenu();
       window.removeEventListener('mousedown', closeMenu);
