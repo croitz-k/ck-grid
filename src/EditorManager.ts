@@ -68,6 +68,17 @@ export class EditorManager {
       } else if (e.key === 'Escape') {
         this.stopEditing(false);
         this.container.focus();
+      } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        this.stopEditing(true);
+        if (!this.editingCell) {
+          // Trigger the same key event on container to move focus
+          const navEvent = new KeyboardEvent('keydown', {
+            key: e.key,
+            bubbles: true,
+            cancelable: true
+          });
+          this.container.dispatchEvent(navEvent);
+        }
       }
     });
   }

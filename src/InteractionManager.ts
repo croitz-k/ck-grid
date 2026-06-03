@@ -350,9 +350,17 @@ export class InteractionManager {
     const actions = [
       { label: 'Copy', shortcut: 'Ctrl+C', action: () => document.execCommand('copy') },
       { label: 'Paste', shortcut: 'Ctrl+V', action: () => {
-        // For security reasons, web browsers often restrict programmatic paste access.
-        // We prompt the user to use the native keyboard shortcut.
         alert('Please use Ctrl+V to paste for security reasons.');
+      } },
+      { label: 'divider', action: () => {} },
+      { label: 'Delete Row', action: () => {
+        const pos = this.getCellAt(e.clientX, e.clientY);
+        if (pos) {
+          this.state.deleteRow(pos.rowIndex);
+          this.state.setFocusedCell(null);
+          this.state.setSelection(null);
+          this.renderer.refresh();
+        }
       } },
       { label: 'divider', action: () => {} },
       { label: 'Undo', shortcut: 'Ctrl+Z', action: () => {

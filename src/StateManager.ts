@@ -381,4 +381,15 @@ export class StateManager {
 
     this._rows.push(newRow);
   }
+
+  public deleteRow(rowIndex: number) {
+    if (rowIndex >= 0 && rowIndex < this._rows.length) {
+      this._rows.splice(rowIndex, 1);
+      
+      // If no rows left, add one empty row for data entry mode
+      if (this._rows.length === 0) {
+        this.addRow();
+      }
+    }
+  }
 }
