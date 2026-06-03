@@ -33,7 +33,11 @@ export class InteractionManager {
 
   private initEvents() {
     this.container.addEventListener('mousedown', this.handleMouseDown.bind(this));
-    this.container.addEventListener('click', () => this.container.focus());
+    this.container.addEventListener('click', (e) => {
+      // Don't steal focus if clicking on footer controls
+      if ((e.target as HTMLElement).closest('.ck-grid-footer')) return;
+      this.container.focus();
+    });
     this.container.addEventListener('dblclick', this.handleDblClick.bind(this));
     this.container.addEventListener('keydown', this.handleKeyDown.bind(this));
     this.container.addEventListener('copy', this.handleCopy.bind(this));

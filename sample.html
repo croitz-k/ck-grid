@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CK-Grid Library Sample</title>
     <!-- Cache busting for CSS -->
-    <link rel="stylesheet" href="./dist/style.css?v=3">
+    <link rel="stylesheet" href="./dist/style.css?v=4">
     <style>
         body {
             margin: 0;
@@ -63,7 +63,7 @@
 <body>
     <div class="header">
         <h1 style="margin:0; font-size: 24px; color: #1a1a1a;">CK-Grid Standard Sample</h1>
-        <p style="color:#666; margin: 5px 0 0 0;">가상화 렌더링, 페이지네이션, 커스텀 스타일링 데모</p>
+        <p style="color:#666; margin: 5px 0 0 0;">가상화 렌더링, 페이지네이션, <b>다중 행 지능형 붙여넣기</b> 데모</p>
     </div>
 
     <div class="controls">
@@ -77,7 +77,7 @@
 
     <!-- Cache busting for JS -->
     <script type="module">
-        import { CKGrid } from './dist/ck-grid.js?v=3';
+        import { CKGrid } from './dist/ck-grid.js?v=4';
 
         const columns = [
             { field: 'id', headerName: 'ID', width: 70, sortable: true },

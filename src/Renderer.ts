@@ -209,10 +209,14 @@ export class Renderer {
       this.fullRefresh();
     });
     this.footerContainer.querySelector('.ck-grid-page-size')?.addEventListener('change', (e) => {
+      e.stopPropagation();
       const newSize = parseInt((e.target as HTMLSelectElement).value);
       this.state.setPageSize(newSize);
       this.fullRefresh();
     });
+
+    this.footerContainer.addEventListener('mousedown', (e) => e.stopPropagation());
+    this.footerContainer.addEventListener('click', (e) => e.stopPropagation());
   }
 
   private fullRefresh() {
