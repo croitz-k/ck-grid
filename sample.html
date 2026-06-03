@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CK-Grid Library Sample</title>
+    <!-- Cache busting for CSS -->
+    <link rel="stylesheet" href="./dist/style.css?v=3">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            background-color: #f0f2f5;
+        }
+        .header {
+            margin-bottom: 20px;
+        }
+        #grid-container {
+            flex: 1;
+            width: 100%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            background: white;
+            overflow: hidden;
+        }
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #1976d2; }
+        .stat-badge {
+            font-size: 13px;
+            color: #555;
+            background: #e9ecef;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 style="margin:0; font-size: 24px; color: #1a1a1a;">CK-Grid Standard Sample</h1>
+        <p style="color:#666; margin: 5px 0 0 0;">가상화 렌더링, 페이지네이션, 커스텀 스타일링 데모</p>
+    </div>
+
+    <div class="controls">
+        <button id="add-data">1,000행 추가</button>
+        <button id="toggle-pagination" style="background-color: #546e7a;">페이징 토글</button>
+        <div class="stat-badge">전체 데이터: <strong id="row-count">0</strong> 건</div>
+    </div>
+    
+    <!-- The Grid Container -->
+    <div id="grid-container"></div>
+
+    <!-- Cache busting for JS -->
+    <script type="module">
+        import { CKGrid } from './dist/ck-grid.js?v=3';
+
+        const columns = [
+            { field: 'id', headerName: 'ID', width: 70, sortable: true },
+            { field: 'name', headerName: '상품명', width: 200, sortable: true },
+            { field: 'category', headerName: '카테고리', width: 120, sortable: true },
+            { 
+                field: 'price', 
+                headerName: '단가', 
+                width: 130, 
+                sortable: true,
+                cellStyle: ({value}) => value > 800 ? { color: '#d32f2f', fontWeight: 'bold' } : {},
+                formatter: ({value}) => new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value)
+            },
+            { 
+                field: 'stock', 
+                headerName: '재고', 
+                width: 100, 
+                sortable: true,
+                cellStyle: ({value}) => value < 50 ? { backgroundColor: '#fff9c4', color: '#856404' } : {}
+            },
+            { 
+                field: 'rating', 
+                headerName: '별점', 
+                width: 100, 
+                sortable: true, 
+                formatter: ({value}) => '⭐'.repeat(Math.floor(value)) + '☆'.repeat(5 - Math.floor(value)) 
+            },
+            { field: 'lastUpdated', headerName: '최종 갱신일', width: 180 },
+        ];
+
+        let data = [];
+        const categories = ['전자제품', '도서', '의류', '가전', '생활용품', '완구'];
+
+        function generateData(count, startId = 0) {
+            const newData = [];
+            for (let i = 0; i < count; i++) {
+                const id = startId + i;
+                newData.push({
+                    id: id,
+                    name: `프리미엄 상품 Alpha-${id}`,
+                    category: categories[id % categories.length],
+                    price: Math.floor(Math.random() * 1000) + 100,
+                    stock: Math.floor(Math.random() * 500),
+                    rating: (Math.random() * 5).toFixed(1),
+                    lastUpdated: new Date().toLocaleString()
+                });
+            }
+            return newData;
+        }
+
+        data = generateData(5000);
+        document.getElementById('row-count').textContent = data.length.toLocaleString();
+
+        // Initialize CK-Grid
+        const grid = new CKGrid({
+            container: document.getElementById('grid-container'),
+            columns: columns,
+            data: data,
+            rowHeight: 36,
+            headerHeight: 44,
+            pagination: true,
+            pageSize: 100
+        });
+
+        // 1,000 rows append
+        document.getElementById('add-data').addEventListener('click', () => {
+            const newData = generateData(1000, data.length);
+            data = [...data, ...newData];
+            grid.updateData(data);
+            document.getElementById('row-count').textContent = data.length.toLocaleString();
+        });
+
+        // Toggle pagination dynamicly
+        let paginationEnabled = true;
+        document.getElementById('toggle-pagination').addEventListener('click', () => {
+            paginationEnabled = !paginationEnabled;
+            grid.updateOptions({ pagination: paginationEnabled });
+        });
+    </script>
+</body>
+</html>
