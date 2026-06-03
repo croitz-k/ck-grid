@@ -60,6 +60,10 @@ export class StateManager {
     this._footerHeight = options.footerHeight || 35;
     this._pagination = options.pagination || false;
 
+    if (this._rows.length === 0) {
+      this.addRow();
+    }
+
     this._state = {
       focusedCell: null,
       selection: null,
@@ -347,7 +351,7 @@ export class StateManager {
     }
   }
 
-  undo(): boolean {
+  public undo(): boolean {
     const action = this._undoStack.pop();
     if (!action) return false;
 
@@ -359,5 +363,22 @@ export class StateManager {
     });
 
     return true;
+  }
+
+  public addRow() {
+    const newRowData: any = {};
+    this._columns.forEach(col => {
+      if (col.field !== '__row_number__') {
+        newRowData[col.field] = '';
+      }
+    });
+
+    const newRow: GridRow = {
+      id: this._rowIdField ? `new-${Date.now()}` : `row-${this._rows.length}`,
+      data: newRowData,
+      originalIndex: this._rows.length
+    };
+
+    this._rows.push(newRow);
   }
 }

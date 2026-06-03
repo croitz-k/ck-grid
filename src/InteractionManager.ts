@@ -222,7 +222,20 @@ export class InteractionManager {
         if (e.shiftKey) colIndex = Math.max(0, colIndex - 1);
         else colIndex = Math.min(visibleCols.length - 1, colIndex + 1);
         break;
-      case 'Enter': rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); break;
+      case 'Enter': 
+        if (rowIndex === this.state.pagedData.length - 1) {
+          this.state.addRow();
+          this.renderer.refresh();
+        }
+        rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); 
+        break;
+      case 'ArrowDown':
+        if (rowIndex === this.state.pagedData.length - 1) {
+          this.state.addRow();
+          this.renderer.refresh();
+        }
+        rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1);
+        break;
     }
 
     if (rowIndex !== focus.rowIndex || colIndex !== focus.colIndex) {
