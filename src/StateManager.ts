@@ -383,14 +383,22 @@ export class StateManager {
   }
 
   public deleteRow(viewIndex: number) {
-    const rowToDelete = this.getRowByViewIndex(viewIndex);
+    // If pagination is enabled, viewIndex is relative to the current page.
+    // However, InteractionManager calculates it relative to the top of pagedData.
+    const rowToDelete = this.pagedData[viewIndex];
     if (!rowToDelete) return;
 
+    // Find in the master list
     const actualIndex = this._rows.findIndex(r => r.id === rowToDelete.id);
     if (actualIndex !== -1) {
       this._rows.splice(actualIndex, 1);
       
-      // If no rows left, add one empty row for data entry mode
+      // If we deleted the only row on a later page, move to previous page
+      if (this._pagination && this._state.currentPage > 1 && this.pagedData.length === 0) {
+        this._state.currentPage--;
+      }
+
+      // If no rows left at all, add one empty row for data entry mode
       if (this._rows.length === 0) {
         this.addRow();
       }
