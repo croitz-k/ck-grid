@@ -1,13 +1,32 @@
+:root {
+  --ck-grid-bg: #ffffff;
+  --ck-grid-text: #1a1a1a;
+  --ck-grid-border: #cccccc;
+  --ck-grid-header-bg: #f5f5f5;
+  --ck-grid-footer-bg: #f8f9fa;
+  --ck-grid-primary: #2196f3;
+  --ck-grid-selection-bg: rgba(33, 150, 243, 0.1);
+  --ck-grid-row-border: #eeeeee;
+  --ck-grid-focused-bg: #ffffff;
+  --ck-grid-invalid-bg: #ffebee;
+  --ck-grid-invalid-border: #d32f2f;
+  --ck-grid-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ck-grid-font-size: 13px;
+  --ck-grid-menu-bg: #ffffff;
+  --ck-grid-menu-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .ck-grid-container {
   display: flex;
   flex-direction: column;
-  background-color: #fff;
-  border: 1px solid #ccc;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 13px;
+  background-color: var(--ck-grid-bg);
+  border: 1px solid var(--ck-grid-border);
+  font-family: var(--ck-grid-font-family);
+  font-size: var(--ck-grid-font-size);
   user-select: none;
   box-sizing: border-box;
   overflow: hidden;
+  color: var(--ck-grid-text);
 }
 
 .ck-grid-body {
@@ -20,8 +39,8 @@
   position: sticky;
   top: 0;
   left: 0;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #ccc;
+  background-color: var(--ck-grid-header-bg);
+  border-bottom: 1px solid var(--ck-grid-border);
   font-weight: bold;
   z-index: 1000;
   white-space: nowrap;
@@ -29,14 +48,28 @@
 
 .ck-grid-header-cell {
   position: absolute;
-  border-right: 1px solid #ccc;
+  border-right: 1px solid var(--ck-grid-border);
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  padding: 0 4px;
-  background-color: #f5f5f5;
+  padding: 0 8px;
+  background-color: var(--ck-grid-header-bg);
   overflow: hidden;
   gap: 4px;
+}
+
+.ck-grid-header-cell.pinned {
+  z-index: 1010;
+}
+
+.ck-grid-header-cell.pinned-left-last {
+  border-right: 2px solid var(--ck-grid-border);
+  box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+}
+
+.ck-grid-header-cell.pinned-right-first {
+  border-left: 2px solid var(--ck-grid-border);
+  box-shadow: -2px 0 5px rgba(0,0,0,0.05);
 }
 
 .ck-grid-sort-indicator svg {
@@ -63,30 +96,44 @@
 
 .ck-grid-cell {
   position: absolute;
-  border-right: 1px solid #eee;
-  border-bottom: 1px solid #eee;
+  border-right: 1px solid var(--ck-grid-row-border);
+  border-bottom: 1px solid var(--ck-grid-row-border);
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  padding: 0 4px;
+  padding: 0 8px;
   overflow: hidden;
   white-space: nowrap;
-  background-color: #fff;
+  background-color: var(--ck-grid-bg);
+}
+
+.ck-grid-cell.pinned {
+  z-index: 50;
+}
+
+.ck-grid-cell.pinned-left-last {
+  border-right: 2px solid var(--ck-grid-border);
+  box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+}
+
+.ck-grid-cell.pinned-right-first {
+  border-left: 2px solid var(--ck-grid-border);
+  box-shadow: -2px 0 5px rgba(0,0,0,0.05);
 }
 
 .ck-grid-cell.focused {
   outline: none !important;
-  z-index: 10;
-  background-color: #fff !important;
+  z-index: 60;
+  background-color: var(--ck-grid-focused-bg) !important;
 }
 
 .ck-grid-cell.selected {
-  background-color: rgba(33, 150, 243, 0.1);
+  background-color: var(--ck-grid-selection-bg);
 }
 
 .ck-grid-selection-border {
   position: absolute;
-  border: 2px solid #2196f3;
+  border: 2px solid var(--ck-grid-primary);
   pointer-events: none;
   z-index: 200;
   box-sizing: border-box;
@@ -96,13 +143,27 @@
 .ck-grid-editor {
   position: absolute;
   box-sizing: border-box;
-  border: 2px solid #2196f3;
-  background-color: #fff;
+  border: 2px solid var(--ck-grid-primary);
+  background-color: var(--ck-grid-bg);
   z-index: 500;
   font-family: inherit;
   font-size: inherit;
-  padding: 0 4px;
+  padding: 0 8px;
   outline: none;
+}
+
+.ck-grid-editor.invalid {
+  border-color: var(--ck-grid-invalid-border) !important;
+  background-color: var(--ck-grid-invalid-bg) !important;
+  animation: ck-grid-shake 0.2s ease-in-out 0s 2;
+}
+
+@keyframes ck-grid-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
 }
 
 .ck-grid-footer {
@@ -110,8 +171,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 10px;
-  background-color: #f8f9fa;
-  border-top: 1px solid #ccc;
+  background-color: var(--ck-grid-footer-bg);
+  border-top: 1px solid var(--ck-grid-border);
   font-size: 12px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -168,5 +229,47 @@
 }
 
 .ck-grid-page-size:focus {
-  border-color: #2196f3;
+  border-color: var(--ck-grid-primary);
+}
+
+.ck-grid-context-menu {
+  position: fixed;
+  background: var(--ck-grid-menu-bg);
+  border: 1px solid var(--ck-grid-border);
+  box-shadow: var(--ck-grid-menu-shadow);
+  border-radius: 4px;
+  padding: 4px 0;
+  z-index: 2000;
+  min-width: 160px;
+}
+
+.ck-grid-menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--ck-grid-text);
+}
+
+.ck-grid-menu-item:hover {
+  background-color: var(--ck-grid-header-bg);
+}
+
+.ck-grid-menu-item.disabled {
+  color: #aaa;
+  cursor: default;
+}
+
+.ck-grid-menu-shortcut {
+  color: #888;
+  font-size: 11px;
+  margin-left: 16px;
+}
+
+.ck-grid-menu-divider {
+  height: 1px;
+  background-color: var(--ck-grid-border);
+  margin: 4px 0;
 }

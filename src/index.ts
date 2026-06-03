@@ -26,4 +26,25 @@ export class CKGrid {
     this.state.updateOptions(options);
     this.renderer.refresh();
   }
+
+  public setColumnVisibility(field: string, visible: boolean) {
+    this.state.setColumnVisibility(field, visible);
+    this.renderer.refresh();
+  }
+
+  public exportCSV(): string {
+    return this.state.csvExport();
+  }
+
+  public undo() {
+    if (this.state.undo()) {
+      this.renderer.render();
+    }
+  }
+
+  public destroy() {
+    // Basic cleanup
+    this.state.updateData([]);
+    this.renderer.body.innerHTML = '';
+  }
 }

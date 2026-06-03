@@ -20,20 +20,23 @@ export class EditorManager {
       this.stopEditing();
     }
 
+    const row = this.state.getRowByViewIndex(pos.rowIndex);
+    const visibleCols = this.state.visibleColumns;
+    const col = visibleCols[pos.colIndex];
+
+    if (col.editable === false) return;
+
     this.editingCell = pos;
     this.state.setIsEditing(true);
     
     this.editor = document.createElement('input');
     this.editor.classList.add('ck-grid-editor');
-    
-    const rowData = this.state.data[pos.rowIndex];
-    const col = this.state.columns[pos.colIndex];
-    this.editor.value = initialValue !== undefined ? initialValue : (rowData ? rowData[col.field] : '');
+    this.editor.value = initialValue !== undefined ? initialValue : (row ? row.data[col.field] : '');
 
     // Position the editor - same as cell
     let left = 0;
     for (let i = 0; i < pos.colIndex; i++) {
-      left += (this.state.columns[i].width || 100);
+      left += (visibleCols[i].width || 100);
     }
 
     this.editor.style.top = `${pos.rowIndex * this.state.rowHeight + this.state.headerHeight}px`;
@@ -59,8 +62,9 @@ export class EditorManager {
     this.editor.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === 'Tab') {
         this.stopEditing(true);
-        this.container.focus();
-        // Enter/Tab in editor should ideally move focus, but let's fix F2 first
+        if (!this.editingCell) { // If validation failed, editingCell remains set
+          this.container.focus();
+        }
       } else if (e.key === 'Escape') {
         this.stopEditing(false);
         this.container.focus();
@@ -74,29 +78,45 @@ export class EditorManager {
 
     if (!editor || !pos) return;
 
-    this.editor = null;
-    this.editingCell = null;
-    this.state.setIsEditing(false);
+    const visibleCols = this.state.visibleColumns;
+    const col = visibleCols[pos.colIndex];
 
     if (save) {
-      const col = this.state.columns[pos.colIndex];
-      if (this.state.data[pos.rowIndex]) {
-        const oldValue = this.state.data[pos.rowIndex][col.field];
+      const row = this.state.getRowByViewIndex(pos.rowIndex);
+      if (row) {
+        const oldValue = row.data[col.field];
         const newValue = editor.value;
 
         if (oldValue !== newValue) {
+          // Validation
+          if (col.validator) {
+            const validationResult = col.validator(newValue);
+            if (validationResult !== true) {
+              editor.classList.add('invalid');
+              if (typeof validationResult === 'string') {
+                editor.title = validationResult;
+              }
+              editor.focus();
+              return; // Keep editing
+            }
+          }
+
           this.state.pushAction({
             changes: [{
-              rowIndex: pos.rowIndex,
+              rowId: row.id,
               field: col.field,
               oldValue: oldValue,
               newValue: newValue
             }]
           });
-          this.state.data[pos.rowIndex][col.field] = newValue;
+          row.data[col.field] = newValue;
         }
       }
     }
+
+    this.editor = null;
+    this.editingCell = null;
+    this.state.setIsEditing(false);
 
     if (editor.parentElement) {
       editor.remove();

@@ -4,23 +4,38 @@ export interface ColumnDef {
   width?: number;
   pinned?: 'left' | 'right';
   sortable?: boolean;
+  editable?: boolean;
+  hidden?: boolean;
+  type?: 'string' | 'number' | 'date' | 'boolean';
+  validator?: (value: string) => boolean | string;
   cellStyle?: (params: { value: any; data: any; rowIndex: number }) => Partial<CSSStyleDeclaration>;
   formatter?: (params: { value: any; data: any; rowIndex: number }) => string;
+}
+
+export interface GridRow {
+  id: string | number;
+  data: any;
+  originalIndex: number;
 }
 
 export interface GridOptions {
   container: HTMLElement;
   columns: ColumnDef[];
   data: any[];
+  rowIdField?: string;
   rowHeight?: number;
   headerHeight?: number;
   footerHeight?: number;
   pagination?: boolean;
   pageSize?: number;
+  showRowNumber?: boolean;
+  onCellChange?: (change: CellChange) => void;
+  onSelectionChange?: (selection: SelectionRange | null) => void;
+  onRowSelect?: (rows: any[]) => void;
 }
 
 export interface CellPosition {
-  rowIndex: number;
+  rowIndex: number; // This is the viewRowIndex (index in the currently displayed paged/sorted list)
   colIndex: number;
 }
 
@@ -38,7 +53,7 @@ export interface GridState {
 }
 
 export interface CellChange {
-  rowIndex: number;
+  rowId: string | number;
   field: string;
   oldValue: any;
   newValue: any;

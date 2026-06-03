@@ -1,27 +1,58 @@
-import { ColumnDef, GridOptions, CellPosition, SelectionRange, GridState, GridAction } from './types';
+import { ColumnDef, GridOptions, CellPosition, SelectionRange, GridState, GridAction, GridRow } from './types';
 
 export class StateManager {
-  private _data: any[];
+  private _rows: GridRow[] = [];
   private _columns: ColumnDef[];
   private _rowHeight: number;
   private _headerHeight: number;
   private _footerHeight: number;
   private _pagination: boolean;
   private _state: GridState;
+  private _rowIdField: string | undefined;
   
   private _sortColumn: string | null = null;
   private _sortDirection: 'asc' | 'desc' | null = null;
   private _undoStack: GridAction[] = [];
-  private _initialDataOrder: any[] = [];
+
+  private _onCellChange?: (change: any) => void;
+  private _onSelectionChange?: (selection: SelectionRange | null) => void;
+  private _onRowSelect?: (rows: any[]) => void;
 
   constructor(options: GridOptions) {
-    this._data = options.data;
-    this._initialDataOrder = [...options.data];
+    this._rowIdField = options.rowIdField;
+    this.processData(options.data);
+    
     this._columns = options.columns.map(col => ({
       ...col,
       width: col.width || 100,
-      sortable: col.sortable !== false
+      sortable: col.sortable !== false,
+      editable: col.editable !== false,
+      hidden: !!col.hidden,
+      pinned: col.pinned
     }));
+
+    if (options.showRowNumber) {
+      this._columns.unshift({
+        field: '__row_number__',
+        headerName: '#',
+        width: 50,
+        sortable: false,
+        editable: false,
+        hidden: false,
+        pinned: 'left',
+        formatter: ({ rowIndex }) => {
+          if (this._pagination) {
+            return ((this._state.currentPage - 1) * this._state.pageSize + rowIndex + 1).toString();
+          }
+          return (rowIndex + 1).toString();
+        }
+      });
+    }
+
+    this._onCellChange = options.onCellChange;
+    this._onSelectionChange = options.onSelectionChange;
+    this._onRowSelect = options.onRowSelect;
+    
     this._rowHeight = options.rowHeight || 30;
     this._headerHeight = options.headerHeight || 35;
     this._footerHeight = options.footerHeight || 35;
@@ -36,8 +67,30 @@ export class StateManager {
     };
   }
 
-  get data() { return this._data; }
+  private processData(data: any[]) {
+    this._rows = data.map((item, index) => ({
+      id: this._rowIdField ? item[this._rowIdField] : `row-${index}`,
+      data: { ...item },
+      originalIndex: index
+    }));
+  }
+
+  get rows() { return this._rows; }
   get columns() { return this._columns; }
+  get visibleColumns() { return this._columns.filter(col => !col.hidden); }
+  get leftPinnedColumns() { return this.visibleColumns.filter(col => col.pinned === 'left'); }
+  get rightPinnedColumns() { return this.visibleColumns.filter(col => col.pinned === 'right'); }
+  get centerColumns() { return this.visibleColumns.filter(col => !col.pinned); }
+
+  public isLastLeftPinned(field: string): boolean {
+    const leftPinned = this.leftPinnedColumns;
+    return leftPinned.length > 0 && leftPinned[leftPinned.length - 1].field === field;
+  }
+
+  public isFirstRightPinned(field: string): boolean {
+    const rightPinned = this.rightPinnedColumns;
+    return rightPinned.length > 0 && rightPinned[0].field === field;
+  }
   get rowHeight() { return this._rowHeight; }
   get headerHeight() { return this._headerHeight; }
   get footerHeight() { return this._footerHeight; }
@@ -47,14 +100,22 @@ export class StateManager {
   get sortDirection() { return this._sortDirection; }
 
   get pagedData() {
-    if (!this._pagination) return this._data;
+    if (!this._pagination) return this._rows;
     const start = (this._state.currentPage - 1) * this._state.pageSize;
     const end = start + this._state.pageSize;
-    return this._data.slice(start, end);
+    return this._rows.slice(start, end);
   }
 
   get totalPages() {
-    return Math.ceil(this._data.length / this._state.pageSize);
+    return Math.ceil(this._rows.length / this._state.pageSize);
+  }
+
+  public getRowByViewIndex(viewIndex: number): GridRow | undefined {
+    return this.pagedData[viewIndex];
+  }
+
+  public getRowById(rowId: string | number): GridRow | undefined {
+    return this._rows.find(r => r.id === rowId);
   }
 
   setFocusedCell(pos: CellPosition | null) {
@@ -63,6 +124,24 @@ export class StateManager {
 
   setSelection(range: SelectionRange | null) {
     this._state.selection = range;
+    if (this._onSelectionChange) {
+      this._onSelectionChange(range);
+    }
+
+    if (this._onRowSelect) {
+      if (!range) {
+        this._onRowSelect([]);
+      } else {
+        const minRow = Math.min(range.start.rowIndex, range.end.rowIndex);
+        const maxRow = Math.max(range.start.rowIndex, range.end.rowIndex);
+        const selectedRows = [];
+        for (let i = minRow; i <= maxRow; i++) {
+          const row = this.getRowByViewIndex(i);
+          if (row) selectedRows.push(row.data);
+        }
+        this._onRowSelect(selectedRows);
+      }
+    }
   }
 
   setIsEditing(editing: boolean) {
@@ -83,7 +162,7 @@ export class StateManager {
   }
 
   get totalWidth() {
-    return this._columns.reduce((sum, col) => sum + (col.width || 100), 0);
+    return this.visibleColumns.reduce((sum, col) => sum + (col.width || 100), 0);
   }
 
   get totalHeight() {
@@ -91,14 +170,23 @@ export class StateManager {
   }
 
   updateData(newData: any[]) {
-    this._data = newData;
-    this._initialDataOrder = [...newData];
+    this.processData(newData);
     this._state.currentPage = 1;
+    this._sortColumn = null;
+    this._sortDirection = null;
+    this._undoStack = [];
   }
 
   updateColumnWidth(index: number, width: number) {
     if (this._columns[index]) {
       this._columns[index].width = width;
+    }
+  }
+
+  setColumnVisibility(field: string, visible: boolean) {
+    const col = this._columns.find(c => c.field === field);
+    if (col) {
+      col.hidden = !visible;
     }
   }
 
@@ -111,6 +199,10 @@ export class StateManager {
   }
 
   sortByColumn(field: string) {
+    const focusedId = this._state.focusedCell ? this.getRowByViewIndex(this._state.focusedCell.rowIndex)?.id : null;
+    const selectionStartId = this._state.selection ? this.getRowByViewIndex(this._state.selection.start.rowIndex)?.id : null;
+    const selectionEndId = this._state.selection ? this.getRowByViewIndex(this._state.selection.end.rowIndex)?.id : null;
+
     if (this._sortColumn === field) {
       if (this._sortDirection === 'asc') {
         this._sortDirection = 'desc';
@@ -127,23 +219,66 @@ export class StateManager {
 
     if (this._sortColumn && this._sortDirection) {
       const dir = this._sortDirection === 'asc' ? 1 : -1;
-      this._data.sort((a, b) => {
-        const valA = a[field];
-        const valB = b[field];
+      this._rows.sort((a, b) => {
+        const valA = a.data[field];
+        const valB = b.data[field];
         if (valA < valB) return -1 * dir;
         if (valA > valB) return 1 * dir;
         return 0;
       });
     } else {
-      this._data.length = 0;
-      this._initialDataOrder.forEach(item => this._data.push(item));
+      this._rows.sort((a, b) => a.originalIndex - b.originalIndex);
     }
+
+    // Re-map focus and selection indexes
+    if (focusedId !== null) {
+      const newIndex = this.getViewIndexByRowId(focusedId);
+      if (newIndex !== -1 && this._state.focusedCell) {
+        this._state.focusedCell.rowIndex = newIndex;
+      }
+    }
+
+    if (selectionStartId !== null && selectionEndId !== null && this._state.selection) {
+      const newStartIdx = this.getViewIndexByRowId(selectionStartId);
+      const newEndIdx = this.getViewIndexByRowId(selectionEndId);
+      if (newStartIdx !== -1 && newEndIdx !== -1) {
+        this._state.selection.start.rowIndex = newStartIdx;
+        this._state.selection.end.rowIndex = newEndIdx;
+      }
+    }
+  }
+
+  public getViewIndexByRowId(rowId: string | number): number {
+    const pagedData = this.pagedData;
+    return pagedData.findIndex(r => r.id === rowId);
+  }
+
+  public csvExport(): string {
+    const headers = this._columns
+      .filter(col => col.field !== '__row_number__')
+      .map(col => `"${col.headerName}"`)
+      .join(',');
+
+    const rows = this._rows.map(row => {
+      return this._columns
+        .filter(col => col.field !== '__row_number__')
+        .map(col => {
+          const val = row.data[col.field];
+          return `"${(val !== undefined && val !== null) ? val.toString().replace(/"/g, '""') : ''}"`;
+        })
+        .join(',');
+    });
+
+    return [headers, ...rows].join('\n');
   }
 
   pushAction(action: GridAction) {
     this._undoStack.push(action);
     if (this._undoStack.length > 100) {
       this._undoStack.shift();
+    }
+    if (this._onCellChange) {
+      action.changes.forEach(change => this._onCellChange!(change));
     }
   }
 
@@ -152,8 +287,9 @@ export class StateManager {
     if (!action) return false;
 
     action.changes.forEach(change => {
-      if (this._data[change.rowIndex]) {
-        this._data[change.rowIndex][change.field] = change.oldValue;
+      const row = this.getRowById(change.rowId);
+      if (row) {
+        row.data[change.field] = change.oldValue;
       }
     });
 

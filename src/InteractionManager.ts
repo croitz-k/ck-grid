@@ -42,7 +42,7 @@ export class InteractionManager {
     this.container.addEventListener('keydown', this.handleKeyDown.bind(this));
     this.container.addEventListener('copy', this.handleCopy.bind(this));
     this.container.addEventListener('paste', this.handlePaste.bind(this));
-    this.container.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.container.addEventListener('contextmenu', this.handleContextMenu.bind(this));
 
     window.addEventListener('mousemove', this.handleMouseMove.bind(this));
     window.addEventListener('mouseup', this.handleMouseUp.bind(this));
@@ -62,8 +62,9 @@ export class InteractionManager {
     
     let colIndex = -1;
     let currentX = 0;
-    for (let i = 0; i < this.state.columns.length; i++) {
-      const w = this.state.columns[i].width || 100;
+    const visibleCols = this.state.visibleColumns;
+    for (let i = 0; i < visibleCols.length; i++) {
+      const w = visibleCols[i].width || 100;
       if (x >= currentX && x < currentX + w) {
         colIndex = i;
         break;
@@ -86,7 +87,8 @@ export class InteractionManager {
       this.isResizing = true;
       this.resizeColIndex = parseInt(target.dataset.index!);
       this.resizeStartX = e.clientX;
-      this.resizeStartWidth = this.state.columns[this.resizeColIndex].width || 100;
+      const visibleCols = this.state.visibleColumns;
+      this.resizeStartWidth = visibleCols[this.resizeColIndex].width || 100;
       e.preventDefault();
       return;
     }
@@ -95,7 +97,7 @@ export class InteractionManager {
       const headerCell = target.closest('.ck-grid-header-cell') as HTMLElement;
       if (headerCell) {
         const colIndex = parseInt(headerCell.dataset.index!);
-        const col = this.state.columns[colIndex];
+        const col = this.state.visibleColumns[colIndex];
         if (col && col.sortable !== false) {
           this.state.sortByColumn(col.field);
           this.renderer.refresh();
@@ -126,7 +128,10 @@ export class InteractionManager {
     if (this.isResizing) {
       const deltaX = e.clientX - this.resizeStartX;
       const newWidth = Math.max(20, this.resizeStartWidth + deltaX);
-      this.state.updateColumnWidth(this.resizeColIndex, newWidth);
+      const visibleCols = this.state.visibleColumns;
+      const colField = visibleCols[this.resizeColIndex].field;
+      const actualColIdx = this.state.columns.findIndex(c => c.field === colField);
+      this.state.updateColumnWidth(actualColIdx, newWidth);
       this.renderer.refresh();
       return;
     }
@@ -163,6 +168,7 @@ export class InteractionManager {
     if (!focus) return;
 
     let { rowIndex, colIndex } = focus;
+    const visibleCols = this.state.visibleColumns;
 
     if (e.ctrlKey && e.key === 'z') {
       if (this.state.undo()) {
@@ -186,7 +192,11 @@ export class InteractionManager {
         case 'ArrowUp': endPos.rowIndex = Math.max(0, endPos.rowIndex - 1); break;
         case 'ArrowDown': endPos.rowIndex = Math.min(this.state.pagedData.length - 1, endPos.rowIndex + 1); break;
         case 'ArrowLeft': endPos.colIndex = Math.max(0, endPos.colIndex - 1); break;
-        case 'ArrowRight': endPos.colIndex = Math.min(this.state.columns.length - 1, endPos.colIndex + 1); break;
+        case 'ArrowRight': endPos.colIndex = Math.min(visibleCols.length - 1, endPos.colIndex + 1); break;
+        case 'PageUp': endPos.rowIndex = Math.max(0, endPos.rowIndex - 20); break;
+        case 'PageDown': endPos.rowIndex = Math.min(this.state.pagedData.length - 1, endPos.rowIndex + 20); break;
+        case 'Home': endPos.colIndex = 0; if (e.ctrlKey) endPos.rowIndex = 0; break;
+        case 'End': endPos.colIndex = visibleCols.length - 1; if (e.ctrlKey) endPos.rowIndex = this.state.pagedData.length - 1; break;
       }
       this.state.setSelection({ start: focus, end: endPos });
       this.ensureVisible(endPos);
@@ -203,10 +213,14 @@ export class InteractionManager {
       case 'ArrowUp': rowIndex = Math.max(0, rowIndex - 1); break;
       case 'ArrowDown': rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); break;
       case 'ArrowLeft': colIndex = Math.max(0, colIndex - 1); break;
-      case 'ArrowRight': colIndex = Math.min(this.state.columns.length - 1, colIndex + 1); break;
+      case 'ArrowRight': colIndex = Math.min(visibleCols.length - 1, colIndex + 1); break;
+      case 'PageUp': rowIndex = Math.max(0, rowIndex - 20); break;
+      case 'PageDown': rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 20); break;
+      case 'Home': colIndex = 0; if (e.ctrlKey) rowIndex = 0; break;
+      case 'End': colIndex = visibleCols.length - 1; if (e.ctrlKey) rowIndex = this.state.pagedData.length - 1; break;
       case 'Tab':
         if (e.shiftKey) colIndex = Math.max(0, colIndex - 1);
-        else colIndex = Math.min(this.state.columns.length - 1, colIndex + 1);
+        else colIndex = Math.min(visibleCols.length - 1, colIndex + 1);
         break;
       case 'Enter': rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); break;
     }
@@ -231,12 +245,15 @@ export class InteractionManager {
     const maxCol = Math.max(selection.start.colIndex, selection.end.colIndex);
 
     let rows = [];
-    const pagedData = this.state.pagedData;
+    const visibleCols = this.state.visibleColumns;
     for (let r = minRow; r <= maxRow; r++) {
       let row = [];
-      for (let c = minCol; c <= maxCol; c++) {
-        const col = this.state.columns[c];
-        row.push(pagedData[r][col.field]);
+      const gridRow = this.state.getRowByViewIndex(r);
+      if (gridRow) {
+        for (let c = minCol; c <= maxCol; c++) {
+          const col = visibleCols[c];
+          row.push(gridRow.data[col.field]);
+        }
       }
       rows.push(row.join('\t'));
     }
@@ -256,40 +273,44 @@ export class InteractionManager {
 
     const pastedRows = text.split(/\r?\n/).map(row => row.split('\t'));
     const changes: any[] = [];
-    const pagedData = this.state.pagedData;
+    const visibleCols = this.state.visibleColumns;
 
     // Determine target range
-    let targetRows: number[] = [];
+    let targetRowIndexes: number[] = [];
     if (selection) {
       const minRow = Math.min(selection.start.rowIndex, selection.end.rowIndex);
       const maxRow = Math.max(selection.start.rowIndex, selection.end.rowIndex);
-      for (let i = minRow; i <= maxRow; i++) targetRows.push(i);
+      for (let i = minRow; i <= maxRow; i++) targetRowIndexes.push(i);
     } else {
-      targetRows = [focus.rowIndex];
+      targetRowIndexes = [focus.rowIndex];
     }
 
-    targetRows.forEach((rowIdx, rOffset) => {
+    targetRowIndexes.forEach((viewRowIdx, rOffset) => {
       // Use pasted row based on index, loop back if selection is larger than copied data
-      const sourceRow = pastedRows[rOffset % pastedRows.length];
+      const sourceRowData = pastedRows[rOffset % pastedRows.length];
+      const gridRow = this.state.getRowByViewIndex(viewRowIdx);
       
-      sourceRow.forEach((cellText, cIdx) => {
-        const targetRow = rowIdx;
-        const targetCol = focus.colIndex + cIdx;
-        
-        if (targetRow < pagedData.length && targetCol < this.state.columns.length) {
-          const col = this.state.columns[targetCol];
-          const oldValue = pagedData[targetRow][col.field];
-          if (oldValue !== cellText) {
-            changes.push({
-              rowIndex: targetRow,
-              field: col.field,
-              oldValue: oldValue,
-              newValue: cellText
-            });
-            pagedData[targetRow][col.field] = cellText;
+      if (gridRow) {
+        sourceRowData.forEach((cellText, cIdx) => {
+          const targetColIdx = focus.colIndex + cIdx;
+          
+          if (targetColIdx < visibleCols.length) {
+            const col = visibleCols[targetColIdx];
+            if (col.editable === false) return;
+
+            const oldValue = gridRow.data[col.field];
+            if (oldValue !== cellText) {
+              changes.push({
+                rowId: gridRow.id,
+                field: col.field,
+                oldValue: oldValue,
+                newValue: cellText
+              });
+              gridRow.data[col.field] = cellText;
+            }
           }
-        }
-      });
+        });
+      }
     });
 
     if (changes.length > 0) {
@@ -299,15 +320,56 @@ export class InteractionManager {
     e.preventDefault();
   }
 
+  private handleContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    
+    const pos = this.getCellAt(e.clientX, e.clientY);
+    if (pos) {
+      this.state.setFocusedCell(pos);
+      this.state.setSelection({ start: pos, end: pos });
+      this.renderer.render();
+    }
+
+    const actions = [
+      { label: 'Copy', shortcut: 'Ctrl+C', action: () => document.execCommand('copy') },
+      { label: 'Paste', shortcut: 'Ctrl+V', action: () => navigator.clipboard.readText().then(text => {
+        // We can't easily trigger a 'paste' event manually with data, 
+        // so we reuse handlePaste logic or just let the user use Ctrl+V.
+        // For simplicity, we just remind them or implement a manual trigger.
+        alert('Please use Ctrl+V to paste for security reasons.');
+      }) },
+      { label: 'divider', action: () => {} },
+      { label: 'Undo', shortcut: 'Ctrl+Z', action: () => {
+        if (this.state.undo()) this.renderer.render();
+      } },
+      { label: 'divider', action: () => {} },
+      { label: 'Export CSV', action: () => {
+        const csv = this.state.csvExport();
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'export.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } }
+    ];
+
+    this.renderer.showContextMenu(e.clientX, e.clientY, actions);
+  }
+
   private ensureVisible(pos: CellPosition) {
     const rowTop = pos.rowIndex * this.state.rowHeight + this.state.headerHeight;
     const rowBottom = rowTop + this.state.rowHeight;
     
     let colLeft = 0;
+    const visibleCols = this.state.visibleColumns;
     for (let i = 0; i < pos.colIndex; i++) {
-      colLeft += (this.state.columns[i].width || 100);
+      colLeft += (visibleCols[i].width || 100);
     }
-    const colRight = colLeft + (this.state.columns[pos.colIndex].width || 100);
+    const colRight = colLeft + (visibleCols[pos.colIndex].width || 100);
 
     const scrollTop = this.scrollContainer.scrollTop;
     const scrollLeft = this.scrollContainer.scrollLeft;

@@ -134,13 +134,59 @@ export class Renderer {
     this.headerContainer.style.height = `${this.state.headerHeight}px`;
     this.headerContainer.style.width = `${this.state.totalWidth}px`;
 
-    let left = 0;
-    this.state.columns.forEach((col, index) => {
+    const scrollLeft = this.gridBody.scrollLeft;
+    const viewportWidth = this.gridBody.clientWidth;
+    const visibleCols = this.state.visibleColumns;
+    
+    // Pre-calculate pinned widths and offsets
+    let leftPinnedOffset = 0;
+    const leftPinnedWidths = this.state.leftPinnedColumns.map(col => {
+      const w = col.width || 100;
+      const offset = leftPinnedOffset;
+      leftPinnedOffset += w;
+      return { field: col.field, offset };
+    });
+
+    let rightPinnedOffset = 0;
+    const rightPinnedWidths = this.state.rightPinnedColumns.reverse().map(col => {
+      const w = col.width || 100;
+      rightPinnedOffset += w;
+      const offset = rightPinnedOffset;
+      return { field: col.field, offset };
+    }).reverse();
+
+    let currentX = 0;
+    visibleCols.forEach((col, index) => {
       const headerCell = document.createElement('div');
       headerCell.classList.add('ck-grid-header-cell');
       headerCell.dataset.index = index.toString();
+      headerCell.dataset.field = col.field;
+      
+      const colWidth = col.width || 100;
+      let left = currentX;
+
+      if (col.pinned === 'left') {
+        const p = leftPinnedWidths.find(pw => pw.field === col.field);
+        left = scrollLeft + (p?.offset || 0);
+        headerCell.classList.add('pinned', 'pinned-left');
+        if (this.state.isLastLeftPinned(col.field) && scrollLeft > 0) {
+          headerCell.classList.add('pinned-left-last');
+        }
+      } else if (col.pinned === 'right') {
+        const p = rightPinnedWidths.find(pw => pw.field === col.field);
+        left = scrollLeft + viewportWidth - (p?.offset || 0);
+        headerCell.classList.add('pinned', 'pinned-right');
+        if (this.state.isFirstRightPinned(col.field)) {
+          // Check if there is content to scroll under it
+          const maxScroll = this.state.totalWidth - viewportWidth;
+          if (scrollLeft < maxScroll) {
+            headerCell.classList.add('pinned-right-first');
+          }
+        }
+      }
+
       headerCell.style.left = `${left}px`;
-      headerCell.style.width = `${col.width}px`;
+      headerCell.style.width = `${colWidth}px`;
       headerCell.style.height = `${this.state.headerHeight}px`;
       
       const textSpan = document.createElement('span');
@@ -163,7 +209,7 @@ export class Renderer {
       headerCell.appendChild(resizeHandle);
 
       this.headerContainer.appendChild(headerCell);
-      left += (col.width || 100);
+      currentX += colWidth;
     });
   }
 
@@ -179,7 +225,7 @@ export class Renderer {
   public updateFooterContent() {
     if (!this.state.pagination) return;
 
-    const totalRows = this.state.data.length;
+    const totalRows = this.state.rows.length;
     const currentPage = this.state.state.currentPage;
     const totalPages = this.state.totalPages;
     const pageSize = this.state.state.pageSize;
@@ -249,7 +295,7 @@ export class Renderer {
     
     const visibleCols: number[] = [];
     let currentX = 0;
-    this.state.columns.forEach((col, index) => {
+    this.state.visibleColumns.forEach((col, index) => {
       const colWidth = col.width || 100;
       if (currentX + colWidth > scrollLeft && currentX < scrollLeft + viewportWidth) {
         visibleCols.push(index);
@@ -301,37 +347,64 @@ export class Renderer {
     const minCol = Math.min(selection.start.colIndex, selection.end.colIndex);
     const maxCol = Math.max(selection.start.colIndex, selection.end.colIndex);
 
-    let left = 0;
-    for (let i = 0; i < minCol; i++) {
-      left += (this.state.columns[i].width || 100);
-    }
+    const scrollLeft = this.gridBody.scrollLeft;
+    const viewportWidth = this.gridBody.clientWidth;
+    const visibleCols = this.state.visibleColumns;
 
-    let width = 0;
-    for (let i = minCol; i <= maxCol; i++) {
-      width += (this.state.columns[i].width || 100);
-    }
+    // We need to find the visual left and visual right of the selection
+    let visualLeft = 0;
+    let visualRight = 0;
+
+    const getVisualLeft = (colIdx: number) => {
+      let currentX = 0;
+      for (let i = 0; i < colIdx; i++) {
+        currentX += (visibleCols[i].width || 100);
+      }
+      const col = visibleCols[colIdx];
+      if (col.pinned === 'left') {
+        return scrollLeft + currentX;
+      } else if (col.pinned === 'right') {
+        // Calculate right offset
+        let rightOffset = 0;
+        for (let i = visibleCols.length - 1; i >= colIdx; i--) {
+          rightOffset += (visibleCols[i].width || 100);
+        }
+        return scrollLeft + viewportWidth - rightOffset;
+      }
+      return currentX;
+    };
+
+    visualLeft = getVisualLeft(minCol);
+    visualRight = getVisualLeft(maxCol) + (visibleCols[maxCol].width || 100);
 
     const top = minRow * this.state.rowHeight + this.state.headerHeight;
     const height = (maxRow - minRow + 1) * this.state.rowHeight;
 
     this.selectionBorder.style.top = `${top}px`;
-    this.selectionBorder.style.left = `${left}px`;
-    this.selectionBorder.style.width = `${width}px`;
+    this.selectionBorder.style.left = `${visualLeft}px`;
+    this.selectionBorder.style.width = `${visualRight - visualLeft}px`;
     this.selectionBorder.style.height = `${height}px`;
   }
 
   private refreshCell(cell: HTMLDivElement, rowIndex: number, colIndex: number) {
-    const col = this.state.columns[colIndex];
+    const col = this.state.visibleColumns[colIndex];
     const pagedData = this.state.pagedData;
-    const rowData = pagedData[rowIndex];
+    const row = pagedData[rowIndex];
     const state = this.state.state;
     const isEditingThisCell = state.focusedCell && state.focusedCell.rowIndex === rowIndex && state.focusedCell.colIndex === colIndex && state.isEditing;
     
-    const rawValue = rowData ? rowData[col.field] : '';
+    const rawValue = row ? row.data[col.field] : '';
     let displayValue = (rawValue !== undefined && rawValue !== null) ? rawValue.toString() : '';
     
-    if (col.formatter && rowData) {
-      displayValue = col.formatter({ value: rawValue, data: rowData, rowIndex });
+    if (col.formatter && row) {
+      displayValue = col.formatter({ value: rawValue, data: row.data, rowIndex });
+    } else if (col.type === 'number' && !isNaN(parseFloat(rawValue))) {
+      displayValue = parseFloat(rawValue).toLocaleString();
+    } else if (col.type === 'date' && rawValue) {
+      const date = new Date(rawValue);
+      if (!isNaN(date.getTime())) {
+        displayValue = date.toLocaleDateString();
+      }
     }
 
     const finalValue = isEditingThisCell ? '' : displayValue;
@@ -342,21 +415,50 @@ export class Renderer {
     cell.style.backgroundColor = '';
     cell.style.color = '';
     cell.style.fontWeight = '';
-    cell.style.textAlign = '';
+    cell.style.textAlign = col.type === 'number' ? 'right' : '';
 
-    if (col.cellStyle && rowData) {
-      const styles = col.cellStyle({ value: rawValue, data: rowData, rowIndex });
+    if (col.cellStyle && row) {
+      const styles = col.cellStyle({ value: rawValue, data: row.data, rowIndex });
       Object.assign(cell.style, styles);
     }
 
     this.updateCellHighlight(cell, rowIndex, colIndex);
+    
+    // Add pinned classes
+    cell.classList.remove('pinned', 'pinned-left', 'pinned-right', 'pinned-left-last', 'pinned-right-first');
+    if (col.pinned) {
+      cell.classList.add('pinned', `pinned-${col.pinned}`);
+      if (col.pinned === 'left' && this.state.isLastLeftPinned(col.field) && this.gridBody.scrollLeft > 0) {
+        cell.classList.add('pinned-left-last');
+      }
+      if (col.pinned === 'right' && this.state.isFirstRightPinned(col.field)) {
+        const maxScroll = this.state.totalWidth - this.gridBody.clientWidth;
+        if (this.gridBody.scrollLeft < maxScroll) {
+          cell.classList.add('pinned-right-first');
+        }
+      }
+    }
   }
 
   private updateCellPosition(cell: HTMLDivElement, rowIndex: number, colIndex: number) {
-    const col = this.state.columns[colIndex];
+    const visibleCols = this.state.visibleColumns;
+    const col = visibleCols[colIndex];
+    const scrollLeft = this.gridBody.scrollLeft;
+    const viewportWidth = this.gridBody.clientWidth;
+
     let left = 0;
     for (let i = 0; i < colIndex; i++) {
-      left += (this.state.columns[i].width || 100);
+      left += (visibleCols[i].width || 100);
+    }
+
+    if (col.pinned === 'left') {
+      left = scrollLeft + left;
+    } else if (col.pinned === 'right') {
+      let rightOffset = 0;
+      for (let i = visibleCols.length - 1; i >= colIndex; i--) {
+        rightOffset += (visibleCols[i].width || 100);
+      }
+      left = scrollLeft + viewportWidth - rightOffset;
     }
 
     cell.style.top = `${rowIndex * this.state.rowHeight + this.state.headerHeight}px`;
@@ -401,6 +503,60 @@ export class Renderer {
       if (rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol) {
         cell.classList.add('selected');
       }
+    }
+  }
+
+  private contextMenu: HTMLDivElement | null = null;
+
+  public showContextMenu(x: number, y: number, actions: { label: string, shortcut?: string, action: () => void, disabled?: boolean }[]) {
+    this.hideContextMenu();
+
+    this.contextMenu = document.createElement('div');
+    this.contextMenu.classList.add('ck-grid-context-menu');
+    this.contextMenu.style.left = `${x}px`;
+    this.contextMenu.style.top = `${y}px`;
+
+    actions.forEach(item => {
+      if (item.label === 'divider') {
+        const divider = document.createElement('div');
+        divider.classList.add('ck-grid-menu-divider');
+        this.contextMenu!.appendChild(divider);
+        return;
+      }
+
+      const menuItem = document.createElement('div');
+      menuItem.classList.add('ck-grid-menu-item');
+      if (item.disabled) menuItem.classList.add('disabled');
+
+      menuItem.innerHTML = `
+        <span>${item.label}</span>
+        ${item.shortcut ? `<span class="ck-grid-menu-shortcut">${item.shortcut}</span>` : ''}
+      `;
+
+      if (!item.disabled) {
+        menuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          item.action();
+          this.hideContextMenu();
+        });
+      }
+
+      this.contextMenu!.appendChild(menuItem);
+    });
+
+    document.body.appendChild(this.contextMenu);
+
+    const closeMenu = () => {
+      this.hideContextMenu();
+      window.removeEventListener('mousedown', closeMenu);
+    };
+    window.addEventListener('mousedown', closeMenu);
+  }
+
+  public hideContextMenu() {
+    if (this.contextMenu) {
+      this.contextMenu.remove();
+      this.contextMenu = null;
     }
   }
 }
