@@ -167,6 +167,12 @@ export class InteractionManager {
     const focus = this.state.state.focusedCell;
     if (!focus) return;
 
+    if (e.key === 'Delete') {
+      this.clearSelectedCells();
+      e.preventDefault();
+      return;
+    }
+
     let { rowIndex, colIndex } = focus;
     const visibleCols = this.state.visibleColumns;
 
@@ -265,6 +271,54 @@ export class InteractionManager {
 
     e.clipboardData.setData('text/plain', rows.join('\n'));
     e.preventDefault();
+  }
+
+  private clearSelectedCells() {
+    const selection = this.state.state.selection;
+    const focus = this.state.state.focusedCell;
+    if (!focus) return;
+
+    const changes: any[] = [];
+    const visibleCols = this.state.visibleColumns;
+
+    let targetCells: { rowIndex: number, colIndex: number }[] = [];
+
+    if (selection) {
+      const minRow = Math.min(selection.start.rowIndex, selection.end.rowIndex);
+      const maxRow = Math.max(selection.start.rowIndex, selection.end.rowIndex);
+      const minCol = Math.min(selection.start.colIndex, selection.end.colIndex);
+      const maxCol = Math.max(selection.start.colIndex, selection.end.colIndex);
+
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          targetCells.push({ rowIndex: r, colIndex: c });
+        }
+      }
+    } else {
+      targetCells.push(focus);
+    }
+
+    targetCells.forEach(pos => {
+      const row = this.state.getRowByViewIndex(pos.rowIndex);
+      const col = visibleCols[pos.colIndex];
+      if (row && col && col.editable !== false) {
+        const oldValue = row.data[col.field];
+        if (oldValue !== '' && oldValue !== undefined && oldValue !== null) {
+          changes.push({
+            rowId: row.id,
+            field: col.field,
+            oldValue: oldValue,
+            newValue: ''
+          });
+          row.data[col.field] = '';
+        }
+      }
+    });
+
+    if (changes.length > 0) {
+      this.state.pushAction({ changes });
+      this.renderer.render();
+    }
   }
 
   private handlePaste(e: ClipboardEvent) {

@@ -374,7 +374,7 @@ export class StateManager {
     });
 
     const newRow: GridRow = {
-      id: this._rowIdField ? `new-${Date.now()}` : `row-${this._rows.length}`,
+      id: `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       data: newRowData,
       originalIndex: this._rows.length
     };
