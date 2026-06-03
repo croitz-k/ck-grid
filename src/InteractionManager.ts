@@ -211,7 +211,13 @@ export class InteractionManager {
         e.preventDefault();
         return;
       case 'ArrowUp': rowIndex = Math.max(0, rowIndex - 1); break;
-      case 'ArrowDown': rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); break;
+      case 'ArrowDown': 
+        if (rowIndex === this.state.pagedData.length - 1) {
+          this.state.addRow();
+          this.renderer.refresh();
+        }
+        rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); 
+        break;
       case 'ArrowLeft': colIndex = Math.max(0, colIndex - 1); break;
       case 'ArrowRight': colIndex = Math.min(visibleCols.length - 1, colIndex + 1); break;
       case 'PageUp': rowIndex = Math.max(0, rowIndex - 20); break;
@@ -221,20 +227,6 @@ export class InteractionManager {
       case 'Tab':
         if (e.shiftKey) colIndex = Math.max(0, colIndex - 1);
         else colIndex = Math.min(visibleCols.length - 1, colIndex + 1);
-        break;
-      case 'Enter': 
-        if (rowIndex === this.state.pagedData.length - 1) {
-          this.state.addRow();
-          this.renderer.refresh();
-        }
-        rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); 
-        break;
-      case 'ArrowDown':
-        if (rowIndex === this.state.pagedData.length - 1) {
-          this.state.addRow();
-          this.renderer.refresh();
-        }
-        rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1);
         break;
     }
 

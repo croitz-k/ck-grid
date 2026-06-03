@@ -15,6 +15,9 @@ export class CKGrid {
     this.renderer = new Renderer(options.container, this.state);
     this.editor = new EditorManager(options.container, this.state, this.renderer);
     new InteractionManager(options.container, this.state, this.renderer, this.editor);
+    
+    // Ensure initial state is rendered
+    this.renderer.refresh();
   }
 
   public updateData(data: any[]) {
