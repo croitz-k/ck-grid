@@ -275,14 +275,18 @@ export class InteractionManager {
     const changes: any[] = [];
     const visibleCols = this.state.visibleColumns;
 
-    // Determine target range
+    // Determine target range and starting point
     let targetRowIndexes: number[] = [];
+    let startColIndex: number;
+
     if (selection) {
       const minRow = Math.min(selection.start.rowIndex, selection.end.rowIndex);
       const maxRow = Math.max(selection.start.rowIndex, selection.end.rowIndex);
       for (let i = minRow; i <= maxRow; i++) targetRowIndexes.push(i);
+      startColIndex = Math.min(selection.start.colIndex, selection.end.colIndex);
     } else {
       targetRowIndexes = [focus.rowIndex];
+      startColIndex = focus.colIndex;
     }
 
     targetRowIndexes.forEach((viewRowIdx, rOffset) => {
@@ -292,7 +296,7 @@ export class InteractionManager {
       
       if (gridRow) {
         sourceRowData.forEach((cellText, cIdx) => {
-          const targetColIdx = focus.colIndex + cIdx;
+          const targetColIdx = startColIndex + cIdx;
           
           if (targetColIdx < visibleCols.length) {
             const col = visibleCols[targetColIdx];
@@ -321,13 +325,21 @@ export class InteractionManager {
   }
 
   private handleContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest('.ck-grid-header')) return;
+
     e.preventDefault();
     
     const pos = this.getCellAt(e.clientX, e.clientY);
     if (pos) {
-      this.state.setFocusedCell(pos);
-      this.state.setSelection({ start: pos, end: pos });
+      if (!this.state.isCellInSelection(pos)) {
+        this.state.setFocusedCell(pos);
+        this.state.setSelection({ start: pos, end: pos });
+      }
       this.renderer.render();
+    } else {
+      // If we clicked outside cells (but not on header), don't show the menu
+      return;
     }
 
     const actions = [

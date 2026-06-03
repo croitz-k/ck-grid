@@ -14,6 +14,7 @@ export class StateManager {
   private _sortDirection: 'asc' | 'desc' | null = null;
   private _undoStack: GridAction[] = [];
 
+  private _rowStyle?: (params: { data: any; rowIndex: number }) => Partial<CSSStyleDeclaration>;
   private _onCellChange?: (change: any) => void;
   private _onSelectionChange?: (selection: SelectionRange | null) => void;
   private _onRowSelect?: (rows: any[]) => void;
@@ -49,6 +50,7 @@ export class StateManager {
       });
     }
 
+    this._rowStyle = options.rowStyle;
     this._onCellChange = options.onCellChange;
     this._onSelectionChange = options.onSelectionChange;
     this._onRowSelect = options.onRowSelect;
@@ -92,7 +94,47 @@ export class StateManager {
     return rightPinned.length > 0 && rightPinned[0].field === field;
   }
   get rowHeight() { return this._rowHeight; }
-  get headerHeight() { return this._headerHeight; }
+  
+  get headerLevels(): number {
+    const hasParent = this.visibleColumns.some(col => !!col.parentHeaderName);
+    return hasParent ? 2 : 1;
+  }
+
+  get headerHeight() { 
+    return this._headerHeight * this.headerLevels; 
+  }
+
+  get headerGroups() {
+    const levels = this.headerLevels;
+    if (levels === 1) return [];
+
+    const groups: { name: string; startIndex: number; endIndex: number; width: number; pinned?: 'left' | 'right' }[] = [];
+    const visibleCols = this.visibleColumns;
+
+    let currentGroup: { name: string; startIndex: number; endIndex: number; width: number; pinned?: 'left' | 'right' } | null = null;
+
+    visibleCols.forEach((col, index) => {
+      const parentName = col.parentHeaderName || '';
+      const colWidth = col.width || 100;
+
+      if (currentGroup && currentGroup.name === parentName && currentGroup.pinned === col.pinned) {
+        currentGroup.endIndex = index;
+        currentGroup.width += colWidth;
+      } else {
+        currentGroup = {
+          name: parentName,
+          startIndex: index,
+          endIndex: index,
+          width: colWidth,
+          pinned: col.pinned
+        };
+        groups.push(currentGroup);
+      }
+    });
+
+    return groups;
+  }
+
   get footerHeight() { return this._footerHeight; }
   get pagination() { return this._pagination; }
   get state() { return this._state; }
@@ -116,6 +158,27 @@ export class StateManager {
 
   public getRowById(rowId: string | number): GridRow | undefined {
     return this._rows.find(r => r.id === rowId);
+  }
+
+  public getRowStyle(rowIndex: number): Partial<CSSStyleDeclaration> | undefined {
+    const row = this.getRowByViewIndex(rowIndex);
+    if (row && this._rowStyle) {
+      return this._rowStyle({ data: row.data, rowIndex });
+    }
+    return undefined;
+  }
+
+  isCellInSelection(pos: CellPosition): boolean {
+    const selection = this._state.selection;
+    if (!selection) return false;
+
+    const minRow = Math.min(selection.start.rowIndex, selection.end.rowIndex);
+    const maxRow = Math.max(selection.start.rowIndex, selection.end.rowIndex);
+    const minCol = Math.min(selection.start.colIndex, selection.end.colIndex);
+    const maxCol = Math.max(selection.start.colIndex, selection.end.colIndex);
+
+    return pos.rowIndex >= minRow && pos.rowIndex <= maxRow &&
+           pos.colIndex >= minCol && pos.colIndex <= maxCol;
   }
 
   setFocusedCell(pos: CellPosition | null) {

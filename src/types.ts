@@ -1,6 +1,7 @@
 export interface ColumnDef {
   field: string;
   headerName: string;
+  parentHeaderName?: string; // For multi-level headers
   width?: number;
   pinned?: 'left' | 'right';
   sortable?: boolean;
@@ -29,6 +30,7 @@ export interface GridOptions {
   pagination?: boolean;
   pageSize?: number;
   showRowNumber?: boolean;
+  rowStyle?: (params: { data: any; rowIndex: number }) => Partial<CSSStyleDeclaration>;
   onCellChange?: (change: CellChange) => void;
   onSelectionChange?: (selection: SelectionRange | null) => void;
   onRowSelect?: (rows: any[]) => void;

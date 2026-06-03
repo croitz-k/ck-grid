@@ -81,11 +81,12 @@
 
         const columns = [
             { field: 'id', headerName: 'ID', width: 70, sortable: true },
-            { field: 'name', headerName: '상품명', width: 200, sortable: true },
-            { field: 'category', headerName: '카테고리', width: 120, sortable: true },
+            { field: 'name', headerName: '상품명', parentHeaderName: '기본 정보', width: 200, sortable: true },
+            { field: 'category', headerName: '카테고리', parentHeaderName: '기본 정보', width: 120, sortable: true },
             { 
                 field: 'price', 
                 headerName: '단가', 
+                parentHeaderName: '판매 상태',
                 width: 130, 
                 sortable: true,
                 cellStyle: ({value}) => value > 800 ? { color: '#d32f2f', fontWeight: 'bold' } : {},
@@ -94,6 +95,7 @@
             { 
                 field: 'stock', 
                 headerName: '재고', 
+                parentHeaderName: '판매 상태',
                 width: 100, 
                 sortable: true,
                 cellStyle: ({value}) => value < 50 ? { backgroundColor: '#fff9c4', color: '#856404' } : {}
@@ -101,11 +103,12 @@
             { 
                 field: 'rating', 
                 headerName: '별점', 
+                parentHeaderName: '고객 평가',
                 width: 100, 
                 sortable: true, 
                 formatter: ({value}) => '⭐'.repeat(Math.floor(value)) + '☆'.repeat(5 - Math.floor(value)) 
             },
-            { field: 'lastUpdated', headerName: '최종 갱신일', width: 180 },
+            { field: 'lastUpdated', headerName: '최종 갱신일', parentHeaderName: '고객 평가', width: 180 },
         ];
 
         let data = [];
@@ -139,7 +142,13 @@
             rowHeight: 36,
             headerHeight: 44,
             pagination: true,
-            pageSize: 100
+            pageSize: 100,
+            rowStyle: ({ data }) => {
+                if (data.category === '전자제품') {
+                    return { backgroundColor: '#ffff00' }; // Bright yellow
+                }
+                return {};
+            }
         });
 
         // 1,000 rows append

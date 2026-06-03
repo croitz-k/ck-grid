@@ -131,12 +131,14 @@ export class Renderer {
 
   private renderHeaders() {
     this.headerContainer.innerHTML = '';
-    this.headerContainer.style.height = `${this.state.headerHeight}px`;
-    this.headerContainer.style.width = `${this.state.totalWidth}px`;
-
     const scrollLeft = this.gridBody.scrollLeft;
     const viewportWidth = this.gridBody.clientWidth;
     const visibleCols = this.state.visibleColumns;
+    const levels = this.state.headerLevels;
+    const singleHeaderHeight = this.state.headerHeight / levels;
+
+    this.headerContainer.style.height = `${this.state.headerHeight}px`;
+    this.headerContainer.style.width = `${this.state.totalWidth}px`;
     
     // Pre-calculate pinned widths and offsets
     let leftPinnedOffset = 0;
@@ -154,6 +156,36 @@ export class Renderer {
       const offset = rightPinnedOffset;
       return { field: col.field, offset };
     }).reverse();
+
+    // Render Level 1 (Top Level / Parent Groups) if exists
+    if (levels > 1) {
+      let currentGroupX = 0;
+      this.state.headerGroups.forEach(group => {
+        const groupCell = document.createElement('div');
+        groupCell.classList.add('ck-grid-header-cell', 'level-top');
+        groupCell.textContent = group.name;
+        
+        let left = currentGroupX;
+        if (group.pinned === 'left') {
+          left = scrollLeft + currentGroupX;
+          groupCell.classList.add('pinned', 'pinned-left');
+        } else if (group.pinned === 'right') {
+          const groupRightOffset = this.state.totalWidth - (currentGroupX + group.width);
+          left = scrollLeft + viewportWidth - group.width - groupRightOffset;
+          groupCell.classList.add('pinned', 'pinned-right');
+        }
+
+        groupCell.style.left = `${left}px`;
+        groupCell.style.width = `${group.width}px`;
+        groupCell.style.height = `${singleHeaderHeight}px`;
+        groupCell.style.top = '0px';
+        groupCell.style.justifyContent = 'center';
+        groupCell.style.borderBottom = '1px solid var(--ck-grid-border)';
+
+        this.headerContainer.appendChild(groupCell);
+        currentGroupX += group.width;
+      });
+    }
 
     let currentX = 0;
     visibleCols.forEach((col, index) => {
@@ -187,7 +219,8 @@ export class Renderer {
 
       headerCell.style.left = `${left}px`;
       headerCell.style.width = `${colWidth}px`;
-      headerCell.style.height = `${this.state.headerHeight}px`;
+      headerCell.style.height = `${singleHeaderHeight}px`;
+      headerCell.style.top = `${levels > 1 ? singleHeaderHeight : 0}px`;
       
       const textSpan = document.createElement('span');
       textSpan.textContent = col.headerName;
@@ -412,14 +445,23 @@ export class Renderer {
       cell.textContent = finalValue;
     }
 
-    cell.style.backgroundColor = '';
+    cell.style.backgroundColor = 'transparent';
     cell.style.color = '';
     cell.style.fontWeight = '';
     cell.style.textAlign = col.type === 'number' ? 'right' : '';
 
+    const rowStyle = this.state.getRowStyle(rowIndex);
+    if (rowStyle) {
+      Object.assign(cell.style, rowStyle);
+    }
+
     if (col.cellStyle && row) {
       const styles = col.cellStyle({ value: rawValue, data: row.data, rowIndex });
       Object.assign(cell.style, styles);
+    }
+
+    if (cell.style.backgroundColor === 'transparent') {
+      cell.style.backgroundColor = '';
     }
 
     this.updateCellHighlight(cell, rowIndex, colIndex);
