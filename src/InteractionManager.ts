@@ -34,8 +34,9 @@ export class InteractionManager {
   private initEvents() {
     this.container.addEventListener('mousedown', this.handleMouseDown.bind(this));
     this.container.addEventListener('click', (e) => {
-      // Don't steal focus if clicking on footer controls
-      if ((e.target as HTMLElement).closest('.ck-grid-footer')) return;
+      const target = e.target as HTMLElement;
+      // Don't steal focus if clicking on footer controls or inline editors
+      if (target.closest('.ck-grid-footer') || target.closest('.ck-grid-inline-select')) return;
       this.container.focus();
     });
     this.container.addEventListener('dblclick', this.handleDblClick.bind(this));
@@ -82,6 +83,11 @@ export class InteractionManager {
     if (e.button !== 0) return;
 
     const target = e.target as HTMLElement;
+    
+    // If clicking inside an active editor, don't do anything
+    if (target.closest('.ck-grid-editor')) {
+      return;
+    }
     
     if (target.classList.contains('ck-grid-header-resize-handle')) {
       this.isResizing = true;
@@ -157,6 +163,8 @@ export class InteractionManager {
   private handleDblClick(e: MouseEvent) {
     const pos = this.getCellAt(e.clientX, e.clientY);
     if (pos) {
+      const col = this.state.visibleColumns[pos.colIndex];
+      if (col.cellType === 'checkbox') return; // Prevent text editing for checkboxes
       this.editor.startEditing(pos);
     }
   }
@@ -175,6 +183,7 @@ export class InteractionManager {
 
     let { rowIndex, colIndex } = focus;
     const visibleCols = this.state.visibleColumns;
+    const col = visibleCols[colIndex];
 
     if (e.ctrlKey && e.key === 'z') {
       if (this.state.undo()) {
@@ -188,8 +197,10 @@ export class InteractionManager {
     let endPos = selection ? { ...selection.end } : { ...focus };
 
     if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      this.editor.startEditing(focus, e.key);
-      e.preventDefault();
+      if (col.cellType !== 'checkbox') {
+        this.editor.startEditing(focus, e.key);
+        e.preventDefault();
+      }
       return;
     }
 
@@ -218,9 +229,13 @@ export class InteractionManager {
         return;
       case 'ArrowUp': rowIndex = Math.max(0, rowIndex - 1); break;
       case 'ArrowDown': 
-        if (rowIndex === this.state.pagedData.length - 1) {
-          this.state.addRow();
-          this.renderer.refresh();
+        if (rowIndex === this.state.pagedData.length - 1 && this.state.allowAutoRowAddition) {
+          // Block if pagination is enabled and the current page is already full
+          const isFullPage = this.state.pagination && (this.state.pagedData.length >= this.state.state.pageSize);
+          if (!isFullPage) {
+            this.state.addRow();
+            this.renderer.refresh();
+          }
         }
         rowIndex = Math.min(this.state.pagedData.length - 1, rowIndex + 1); 
         break;

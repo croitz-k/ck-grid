@@ -38,7 +38,7 @@
 .ck-grid-header {
   position: sticky;
   top: 0;
-  left: 0;
+  left: auto;
   background-color: var(--ck-grid-header-bg);
   border-bottom: 1px solid var(--ck-grid-border);
   font-weight: bold;
@@ -49,6 +49,7 @@
 .ck-grid-header-cell {
   position: absolute;
   border-right: 1px solid var(--ck-grid-border);
+  border-bottom: 1px solid var(--ck-grid-border);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -145,11 +146,39 @@
   box-sizing: border-box;
   border: 2px solid var(--ck-grid-primary);
   background-color: var(--ck-grid-bg);
-  z-index: 500;
+  z-index: 2000; /* Increased to be above everything */
   font-family: inherit;
   font-size: inherit;
   padding: 0 8px;
   outline: none;
+  pointer-events: auto; /* Ensure it can be clicked */
+}
+
+.ck-grid-inline-select {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0 24px 0 8px; /* Extra right padding for the arrow */
+  margin: 0;
+  cursor: pointer;
+  outline: none;
+  appearance: none; /* Hide native arrow to use custom background if needed, or keep for native feel */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23888'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+}
+
+.ck-grid-inline-select:focus {
+  background-color: #fff;
+}
+
+.ck-grid-cell:hover .ck-grid-inline-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232196f3'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
 }
 
 .ck-grid-editor.invalid {

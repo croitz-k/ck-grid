@@ -29,9 +29,14 @@ export class EditorManager {
     this.editingCell = pos;
     this.state.setIsEditing(true);
     
-    this.editor = document.createElement('input');
-    this.editor.classList.add('ck-grid-editor');
-    this.editor.value = initialValue !== undefined ? initialValue : (row ? row.data[col.field] : '');
+    const value = initialValue !== undefined ? initialValue : (row ? row.data[col.field] : '');
+
+    const input = document.createElement('input');
+    input.classList.add('ck-grid-editor');
+    input.value = value;
+    const editor = input;
+
+    this.editor = editor as any;
 
     // Position the editor - same as cell
     let left = 0;
@@ -39,27 +44,34 @@ export class EditorManager {
       left += (visibleCols[i].width || 100);
     }
 
-    this.editor.style.top = `${pos.rowIndex * this.state.rowHeight + this.state.headerHeight}px`;
-    this.editor.style.left = `${left}px`;
-    this.editor.style.width = `${col.width}px`;
-    this.editor.style.height = `${this.state.rowHeight}px`;
+    editor.style.top = `${pos.rowIndex * this.state.rowHeight + this.state.headerHeight}px`;
+    editor.style.left = `${left}px`;
+    editor.style.width = `${col.width}px`;
+    editor.style.height = `${this.state.rowHeight}px`;
 
     const canvas = this.container.querySelector('.ck-grid-canvas');
     if (canvas) {
-      canvas.appendChild(this.editor);
+      canvas.appendChild(editor);
     }
     
-    this.editor.focus();
+    editor.focus();
 
-    if (initialValue === undefined) {
-      this.editor.select();
+    if (initialValue === undefined && editor instanceof HTMLInputElement) {
+      editor.select();
     }
 
     // Hide the text of the cell being edited
     this.renderer.render();
 
-    this.editor.addEventListener('blur', () => this.stopEditing(true));
-    this.editor.addEventListener('keydown', (e) => {
+    editor.addEventListener('mousedown', (e) => e.stopPropagation());
+    editor.addEventListener('click', (e) => e.stopPropagation());
+
+    if (col.cellType === 'select') {
+      editor.addEventListener('change', () => this.stopEditing(true));
+    }
+
+    editor.addEventListener('blur', () => this.stopEditing(true));
+    editor.addEventListener('keydown', ((e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === 'Tab') {
         this.stopEditing(true);
         if (!this.editingCell) { // If validation failed, editingCell remains set
@@ -86,7 +98,7 @@ export class EditorManager {
           this.container.dispatchEvent(navEvent);
         }
       }
-    });
+    }) as EventListener);
   }
 
   public stopEditing(save: boolean = false) {
@@ -146,3 +158,4 @@ export class EditorManager {
     return !!this.editingCell;
   }
 }
+

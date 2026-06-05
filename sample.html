@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CK-Grid Library Sample</title>
+    <title>CK-Grid Library Sample 2</title>
     <!-- Cache busting for CSS -->
-    <link rel="stylesheet" href="./dist/style.css?v=4">
+    <link rel="stylesheet" href="./dist/style.css?v=5">
     <style>
         body {
             margin: 0;
@@ -62,8 +62,8 @@
 </head>
 <body>
     <div class="header">
-        <h1 style="margin:0; font-size: 24px; color: #1a1a1a;">CK-Grid Standard Sample</h1>
-        <p style="color:#666; margin: 5px 0 0 0;">가상화 렌더링, 페이지네이션, <b>다중 행 지능형 붙여넣기</b> 데모</p>
+        <h1 style="margin:0; font-size: 24px; color: #1a1a1a;">CK-Grid Feature Demo 2</h1>
+        <p style="color:#666; margin: 5px 0 0 0;">드롭다운, 체크박스, 자동 너비 조절 및 행 자동 생성 제어 데모</p>
     </div>
 
     <div class="controls">
@@ -77,42 +77,11 @@
 
     <!-- Cache busting for JS -->
     <script type="module">
-        import { CKGrid } from './dist/ck-grid.js?v=4';
-
-        const columns = [
-            { field: 'id', headerName: 'ID', width: 70, sortable: true },
-            { field: 'name', headerName: '상품명', parentHeaderName: '기본 정보', width: 200, sortable: true },
-            { field: 'category', headerName: '카테고리', parentHeaderName: '기본 정보', width: 120, sortable: true },
-            { 
-                field: 'price', 
-                headerName: '단가', 
-                parentHeaderName: '판매 상태',
-                width: 130, 
-                sortable: true,
-                cellStyle: ({value}) => value > 800 ? { color: '#d32f2f', fontWeight: 'bold' } : {},
-                formatter: ({value}) => new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value)
-            },
-            { 
-                field: 'stock', 
-                headerName: '재고', 
-                parentHeaderName: '판매 상태',
-                width: 100, 
-                sortable: true,
-                cellStyle: ({value}) => value < 50 ? { backgroundColor: '#fff9c4', color: '#856404' } : {}
-            },
-            { 
-                field: 'rating', 
-                headerName: '별점', 
-                parentHeaderName: '고객 평가',
-                width: 100, 
-                sortable: true, 
-                formatter: ({value}) => '⭐'.repeat(Math.floor(value)) + '☆'.repeat(5 - Math.floor(value)) 
-            },
-            { field: 'lastUpdated', headerName: '최종 갱신일', parentHeaderName: '고객 평가', width: 180 },
-        ];
+        import { CKGrid } from './dist/ck-grid.js?v=5';
 
         let data = [];
         const categories = ['전자제품', '도서', '의류', '가전', '생활용품', '완구'];
+        const statuses = ['대기', '진행', '완료', '보류'];
 
         function generateData(count, startId = 0) {
             const newData = [];
@@ -121,6 +90,8 @@
                 newData.push({
                     id: id,
                     name: `프리미엄 상품 Alpha-${id}`,
+                    status: statuses[id % statuses.length],
+                    active: id % 2 === 0,
                     category: categories[id % categories.length],
                     price: Math.floor(Math.random() * 1000) + 100,
                     stock: Math.floor(Math.random() * 500),
@@ -137,18 +108,40 @@
         // Initialize CK-Grid
         const grid = new CKGrid({
             container: document.getElementById('grid-container'),
-            columns: columns,
+            autoFitColumns: true, // 가로 너비 자동 채우기
+            allowAutoRowAddition: true, // 자동 행 생성 허용
+            columns: [
+                { field: 'id', headerName: 'ID', width: 70, sortable: true, pinned: 'left', editable: false },
+                { field: 'name', headerName: '상품명', parentHeaderName: '기본 정보', width: 180, sortable: true },
+                { 
+                    field: 'status', 
+                    headerName: '상태', 
+                    parentHeaderName: '기본 정보',
+                    width: 100, 
+                    cellType: 'select', 
+                    options: ['대기', '진행', '완료', '보류'] 
+                },
+                { 
+                    field: 'active', 
+                    headerName: '활성', 
+                    width: 60, 
+                    cellType: 'checkbox' 
+                },
+                { field: 'category', headerName: '카테고리', width: 100, sortable: true },
+                { 
+                    field: 'price', 
+                    headerName: '단가', 
+                    width: 120, 
+                    sortable: true,
+                    formatter: ({value}) => new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value)
+                },
+                { field: 'lastUpdated', headerName: '최종 갱신일', width: 180 },
+            ],
             data: data,
             rowHeight: 36,
             headerHeight: 44,
             pagination: true,
-            pageSize: 100,
-            rowStyle: ({ data }) => {
-                if (data.category === '전자제품') {
-                    return { backgroundColor: '#ffff00' }; // Bright yellow
-                }
-                return {};
-            }
+            pageSize: 100
         });
 
         // 1,000 rows append

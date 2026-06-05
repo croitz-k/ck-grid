@@ -8,6 +8,10 @@ export interface ColumnDef {
   editable?: boolean;
   hidden?: boolean;
   type?: 'string' | 'number' | 'date' | 'boolean';
+  cellType?: 'text' | 'select' | 'checkbox';
+  options?: string[] | { label: string; value: any }[];
+  cellClass?: string | ((params: { value: any; data: any; rowIndex: number }) => string);
+  renderHTML?: boolean;
   validator?: (value: string) => boolean | string;
   cellStyle?: (params: { value: any; data: any; rowIndex: number }) => Partial<CSSStyleDeclaration>;
   formatter?: (params: { value: any; data: any; rowIndex: number }) => string;
@@ -30,6 +34,8 @@ export interface GridOptions {
   pagination?: boolean;
   pageSize?: number;
   showRowNumber?: boolean;
+  autoFitColumns?: boolean;
+  allowAutoRowAddition?: boolean;
   rowStyle?: (params: { data: any; rowIndex: number }) => Partial<CSSStyleDeclaration>;
   onCellChange?: (change: CellChange) => void;
   onSelectionChange?: (selection: SelectionRange | null) => void;

@@ -1,4 +1,4 @@
-import { ColumnDef, GridOptions, CellPosition, SelectionRange, GridState, GridAction, GridRow } from './types';
+import { ColumnDef, GridOptions, CellPosition, SelectionRange, GridState, GridAction, GridRow, CellChange } from './types';
 
 export class StateManager {
   private _rows: GridRow[] = [];
@@ -7,6 +7,8 @@ export class StateManager {
   private _headerHeight: number;
   private _footerHeight: number;
   private _pagination: boolean;
+  private _autoFitColumns: boolean;
+  private _allowAutoRowAddition: boolean;
   private _state: GridState;
   private _rowIdField: string | undefined;
   
@@ -15,7 +17,7 @@ export class StateManager {
   private _undoStack: GridAction[] = [];
 
   private _rowStyle?: (params: { data: any; rowIndex: number }) => Partial<CSSStyleDeclaration>;
-  private _onCellChange?: (change: any) => void;
+  private _onCellChange?: (change: CellChange) => void;
   private _onSelectionChange?: (selection: SelectionRange | null) => void;
   private _onRowSelect?: (rows: any[]) => void;
 
@@ -59,6 +61,8 @@ export class StateManager {
     this._headerHeight = options.headerHeight || 35;
     this._footerHeight = options.footerHeight || 35;
     this._pagination = options.pagination || false;
+    this._autoFitColumns = options.autoFitColumns || false;
+    this._allowAutoRowAddition = options.allowAutoRowAddition !== false; // Default to true
 
     if (this._rows.length === 0) {
       this.addRow();
@@ -141,6 +145,7 @@ export class StateManager {
 
   get footerHeight() { return this._footerHeight; }
   get pagination() { return this._pagination; }
+  get allowAutoRowAddition() { return this._allowAutoRowAddition; }
   get state() { return this._state; }
   get sortColumn() { return this._sortColumn; }
   get sortDirection() { return this._sortDirection; }
@@ -263,6 +268,34 @@ export class StateManager {
     if (options.footerHeight !== undefined) this._footerHeight = options.footerHeight;
     if (options.pagination !== undefined) this._pagination = options.pagination;
     if (options.pageSize !== undefined) this.setPageSize(options.pageSize);
+    if (options.autoFitColumns !== undefined) this._autoFitColumns = options.autoFitColumns;
+    if (options.allowAutoRowAddition !== undefined) this._allowAutoRowAddition = options.allowAutoRowAddition;
+  }
+
+  public recalculateColumnWidths(containerWidth: number) {
+    if (!this._autoFitColumns || containerWidth <= 0) return;
+
+    const visibleCols = this.visibleColumns.filter(c => c.field !== '__row_number__');
+    const rowNumberCol = this.visibleColumns.find(c => c.field === '__row_number__');
+    const rowNumberWidth = rowNumberCol ? (rowNumberCol.width || 50) : 0;
+    
+    const availableWidth = containerWidth - rowNumberWidth;
+    const currentTotalWidth = visibleCols.reduce((sum, col) => sum + (col.width || 100), 0);
+
+    if (currentTotalWidth < availableWidth) {
+      const factor = availableWidth / currentTotalWidth;
+      visibleCols.forEach(col => {
+        col.width = Math.floor((col.width || 100) * factor);
+      });
+      
+      // Adjust the last column to fill any remaining pixels due to floor
+      const newTotalWidth = visibleCols.reduce((sum, col) => sum + (col.width || 100), 0);
+      const diff = availableWidth - newTotalWidth;
+      if (diff > 0 && visibleCols.length > 0) {
+        const lastCol = visibleCols[visibleCols.length - 1];
+        lastCol.width = (lastCol.width || 100) + diff;
+      }
+    }
   }
 
   sortByColumn(field: string) {
@@ -383,36 +416,20 @@ export class StateManager {
   }
 
   public deleteRow(viewIndex: number) {
-    console.log('[StateManager] deleteRow called with viewIndex:', viewIndex);
-    // If pagination is enabled, viewIndex is relative to the current page.
-    // However, InteractionManager calculates it relative to the top of pagedData.
     const rowToDelete = this.pagedData[viewIndex];
-    console.log('[StateManager] Row to delete resolved:', rowToDelete);
-    if (!rowToDelete) {
-      console.warn('[StateManager] Row to delete not found at viewIndex:', viewIndex);
-      return;
-    }
+    if (!rowToDelete) return;
 
-    // Find in the master list
     const actualIndex = this._rows.findIndex(r => r.id === rowToDelete.id);
-    console.log('[StateManager] Actual index in master list:', actualIndex);
     if (actualIndex !== -1) {
       this._rows.splice(actualIndex, 1);
-      console.log('[StateManager] Row removed. Current row count:', this._rows.length);
       
-      // If we deleted the only row on a later page, move to previous page
       if (this._pagination && this._state.currentPage > 1 && this.pagedData.length === 0) {
-        console.log('[StateManager] Current page now empty, moving back to page:', this._state.currentPage - 1);
         this._state.currentPage--;
       }
 
-      // If no rows left at all, add one empty row for data entry mode
       if (this._rows.length === 0) {
-        console.log('[StateManager] No rows left, adding auto-entry row');
         this.addRow();
       }
-    } else {
-      console.error('[StateManager] Row found in pagedData but missing from master list! ID:', rowToDelete.id);
     }
   }
 }

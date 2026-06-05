@@ -69,7 +69,7 @@ export class Renderer {
     Object.assign(this.headerContainer.style, {
       position: 'sticky',
       top: '0',
-      left: '0',
+      left: 'auto',
       zIndex: '1000',
       backgroundColor: '#f5f5f5'
     });
@@ -100,12 +100,24 @@ export class Renderer {
     this.container.appendChild(this.gridBody);
     this.container.appendChild(this.footerContainer);
 
+    // Apply global box-sizing
+    const style = document.createElement('style');
+    style.textContent = `
+      .ck-grid-container, .ck-grid-container * {
+        box-sizing: border-box;
+      }
+    `;
+    document.head.appendChild(style);
+
     this.gridBody.addEventListener('scroll', () => {
       this.render();
     });
 
     // Sync rendering on container resize
-    new ResizeObserver(() => this.render()).observe(this.container);
+    new ResizeObserver(() => {
+      this.state.recalculateColumnWidths(this.gridBody.clientWidth);
+      this.refresh();
+    }).observe(this.gridBody);
 
     this.initialRender();
   }
@@ -120,13 +132,15 @@ export class Renderer {
   }
 
   private updateCanvasSize() {
-    const w = `${this.state.totalWidth}px`;
+    const totalWidth = this.state.totalWidth;
+    const w = `${totalWidth}px`;
     const h = `${this.state.totalHeight + this.state.headerHeight}px`;
     
     this.scroller.style.width = w;
     this.scroller.style.height = h;
     this.canvas.style.width = w;
     this.canvas.style.height = h;
+    this.headerContainer.style.width = w;
   }
 
   private renderHeaders() {
@@ -318,8 +332,6 @@ export class Renderer {
     const viewportHeight = this.gridBody.clientHeight;
     const viewportWidth = this.gridBody.clientWidth;
 
-    this.headerContainer.style.transform = `translateX(${-scrollLeft}px)`;
-
     this.updateSelectionBorder();
 
     const pagedData = this.state.pagedData;
@@ -441,8 +453,106 @@ export class Renderer {
     }
 
     const finalValue = isEditingThisCell ? '' : displayValue;
-    if (cell.textContent !== finalValue) {
-      cell.textContent = finalValue;
+    
+    if (col.cellType === 'checkbox') {
+      // Reuse existing checkbox if possible to avoid focus/state issues
+      let checkbox = cell.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      if (!checkbox) {
+        cell.innerHTML = '';
+        checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.style.cursor = 'pointer';
+        checkbox.addEventListener('change', (e) => {
+          const newValue = (e.target as HTMLInputElement).checked;
+          this.state.pushAction({
+            changes: [{
+              rowId: row.id,
+              field: col.field,
+              oldValue: row.data[col.field],
+              newValue: newValue
+            }]
+          });
+          row.data[col.field] = newValue;
+        });
+        // Stop mousedown/click from bubbling to selection logic
+        checkbox.addEventListener('mousedown', (e) => e.stopPropagation());
+        checkbox.addEventListener('click', (e) => e.stopPropagation());
+        cell.appendChild(checkbox);
+      }
+      checkbox.checked = !!rawValue;
+      cell.style.justifyContent = 'center';
+      cell.style.alignItems = 'center';
+    } else if (col.cellType === 'select') {
+      // Inline native select for immediate interaction
+      let select = cell.querySelector('select.ck-grid-inline-select') as HTMLSelectElement;
+      if (!select) {
+        cell.innerHTML = '';
+        select = document.createElement('select');
+        select.classList.add('ck-grid-inline-select');
+        
+        const options = col.options || [];
+        options.forEach(opt => {
+          const option = document.createElement('option');
+          if (typeof opt === 'string') {
+            option.value = opt;
+            option.textContent = opt;
+          } else {
+            option.value = opt.value;
+            option.textContent = opt.label;
+          }
+          select.appendChild(option);
+        });
+
+        select.addEventListener('change', (e) => {
+          const newValue = (e.target as HTMLSelectElement).value;
+          const oldValue = row.data[col.field];
+          if (oldValue !== newValue) {
+            this.state.pushAction({
+              changes: [{
+                rowId: row.id,
+                field: col.field,
+                oldValue: oldValue,
+                newValue: newValue
+              }]
+            });
+            row.data[col.field] = newValue;
+          }
+        });
+
+        select.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          // Visually update the grid to show selection immediately on mousedown
+          this.state.setFocusedCell({ rowIndex, colIndex });
+          this.state.setSelection({ start: { rowIndex, colIndex }, end: { rowIndex, colIndex } });
+          
+          for (const [key, activeCell] of this.activeCells.entries()) {
+            const parts = key.split('-');
+            this.updateCellHighlight(activeCell, parseInt(parts[0]), parseInt(parts[1]));
+          }
+          this.updateSelectionBorder();
+        });
+
+        // Prevent the container's click listener from stealing focus back
+        select.addEventListener('click', (e) => e.stopPropagation());
+        
+        cell.appendChild(select);
+      }
+      select.value = rawValue || '';
+      cell.style.justifyContent = '';
+      cell.style.alignItems = '';
+      cell.style.padding = '0'; // Allow select to fill cell
+    } else {
+      if (col.renderHTML) {
+        if (cell.innerHTML !== finalValue) {
+          cell.innerHTML = finalValue;
+        }
+      } else {
+        if (cell.textContent !== finalValue) {
+          cell.textContent = finalValue;
+        }
+      }
+      cell.style.justifyContent = '';
+      cell.style.alignItems = '';
     }
 
     cell.style.backgroundColor = 'transparent';
@@ -466,8 +576,9 @@ export class Renderer {
 
     this.updateCellHighlight(cell, rowIndex, colIndex);
     
-    // Add pinned classes
-    cell.classList.remove('pinned', 'pinned-left', 'pinned-right', 'pinned-left-last', 'pinned-right-first');
+    // Reset and Add classes
+    cell.className = 'ck-grid-cell';
+    
     if (col.pinned) {
       cell.classList.add('pinned', `pinned-${col.pinned}`);
       if (col.pinned === 'left' && this.state.isLastLeftPinned(col.field) && this.gridBody.scrollLeft > 0) {
@@ -478,6 +589,15 @@ export class Renderer {
         if (this.gridBody.scrollLeft < maxScroll) {
           cell.classList.add('pinned-right-first');
         }
+      }
+    }
+
+    if (col.cellClass && row) {
+      const customClass = typeof col.cellClass === 'function' 
+        ? col.cellClass({ value: rawValue, data: row.data, rowIndex })
+        : col.cellClass;
+      if (customClass) {
+        customClass.split(' ').filter(c => c).forEach(c => cell.classList.add(c));
       }
     }
   }
